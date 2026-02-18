@@ -19,6 +19,8 @@ This bot bridges Telegram to Agent Zero's HTTP API running inside the Docker con
 
 **Runtime Environment:** The bot must run with `/opt/venv/bin/python3` (Agent Zero's virtual environment) so it can import the settings module for API key discovery. The script lives at `/a0/usr/workdir/telegram_bridge.py`.
 
+**Reverse Proxy Compatibility:** The bot includes `X-Forwarded-For` and `X-Real-IP` headers on every API request. This is required when a reverse proxy (such as a Cloudflare tunnel) is active in the container — without them, SearXNG's bot-detection middleware intercepts the request and returns a 404. The headers are harmless in setups without a reverse proxy.
+
 ---
 
 ## Prerequisites

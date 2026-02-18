@@ -46,18 +46,14 @@ A0_TIMEOUT = int(os.getenv("A0_TIMEOUT", "300"))  # seconds (agent can be slow)
 # Optional: restrict the bot to specific chat IDs (comma-separated).
 # If empty, the bot responds in ALL chats.
 ALLOWED_CHATS = os.getenv("TELEGRAM_CHAT_IDS", "")
-ALLOWED_CHAT_SET = (
-    set(ALLOWED_CHATS.split(",")) if ALLOWED_CHATS.strip() else set()
-)
+ALLOWED_CHAT_SET = set(ALLOWED_CHATS.split(",")) if ALLOWED_CHATS.strip() else set()
 
 # Optional: restrict the bot to specific Telegram user IDs (comma-separated).
 # User IDs are numeric (e.g. 123456789) and never change, unlike usernames.
 # Find your user ID by messaging @userinfobot on Telegram.
 # If empty, the bot responds to ALL users (subject to TELEGRAM_CHAT_IDS above).
 ALLOWED_USERS = os.getenv("TELEGRAM_USER_IDS", "")
-ALLOWED_USER_SET = (
-    set(ALLOWED_USERS.split(",")) if ALLOWED_USERS.strip() else set()
-)
+ALLOWED_USER_SET = set(ALLOWED_USERS.split(",")) if ALLOWED_USERS.strip() else set()
 
 # Telegram message length limit
 TELEGRAM_MAX_LEN = 4096
@@ -109,6 +105,21 @@ log = logging.getLogger("telegram_bridge")
 # ---------------------------------------------------------------------------
 
 chat_contexts: dict[str, str] = {}
+
+
+def is_authorized(update: Update) -> bool:
+    """Check if the incoming update passes chat and user ID filters."""
+    chat_id = str(update.effective_chat.id)
+    user_id = str(update.effective_user.id)
+
+    if ALLOWED_CHAT_SET and chat_id not in ALLOWED_CHAT_SET:
+        return False
+
+    if ALLOWED_USER_SET and user_id not in ALLOWED_USER_SET:
+        log.warning(f"Blocked unauthorized user {user_id} in chat {chat_id}")
+        return False
+
+    return True
 
 
 def split_message(text: str, limit: int = TELEGRAM_MAX_LEN) -> list[str]:
@@ -173,6 +184,8 @@ async def send_to_agent(message_text: str, context_id: str = "") -> dict:
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
+    if not is_authorized(update):
+        return
     await update.message.reply_text(
         "🤖 *Agent Zero Bridge*\n\n"
         "Send me any message and I'll forward it to Agent Zero.\n\n"
@@ -191,6 +204,8 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /reset command — clears conversation context."""
+    if not is_authorized(update):
+        return
     chat_id = str(update.effective_chat.id)
     chat_contexts.pop(chat_id, None)
     await update.message.reply_text("🔄 Conversation reset. Starting fresh.")
@@ -199,6 +214,8 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /status command."""
+    if not is_authorized(update):
+        return
     chat_id = str(update.effective_chat.id)
     ctx = chat_contexts.get(chat_id, "(none)")
     await update.message.reply_text(
@@ -221,18 +238,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
+    if not is_authorized(update):
+        return
+
     chat_id = str(update.effective_chat.id)
-    user_id = str(update.effective_user.id)
-
-    # Chat filter
-    if ALLOWED_CHAT_SET and chat_id not in ALLOWED_CHAT_SET:
-        return
-
-    # User ID filter — silently ignore unauthorized users
-    if ALLOWED_USER_SET and user_id not in ALLOWED_USER_SET:
-        log.warning(f"Blocked unauthorized user {user_id} in chat {chat_id}")
-        return
-
     content = update.message.text.strip()
     if not content:
         return
@@ -332,9 +341,9 @@ if __name__ == "__main__":
     print(f"  API Key:  {A0_API_KEY[:4]}****")
     print(f"  Timeout:  {A0_TIMEOUT}s")
     if ALLOWED_USER_SET:
-        print(f"  Users:    {', '.join(ALLOWED_USER_SET)}")
+        print(f"  Users:    {', '.join(sorted(ALLOWED_USER_SET))}")
     else:
-        print(f"  Users:    (all)")
+        print("  Users:    (all)")
     print("=" * 60)
 
     # Build and run the Telegram bot

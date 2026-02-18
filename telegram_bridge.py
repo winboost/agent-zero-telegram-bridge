@@ -50,6 +50,15 @@ ALLOWED_CHAT_SET = (
     set(ALLOWED_CHATS.split(",")) if ALLOWED_CHATS.strip() else set()
 )
 
+# Optional: restrict the bot to specific Telegram user IDs (comma-separated).
+# User IDs are numeric (e.g. 123456789) and never change, unlike usernames.
+# Find your user ID by messaging @userinfobot on Telegram.
+# If empty, the bot responds to ALL users (subject to TELEGRAM_CHAT_IDS above).
+ALLOWED_USERS = os.getenv("TELEGRAM_USER_IDS", "")
+ALLOWED_USER_SET = (
+    set(ALLOWED_USERS.split(",")) if ALLOWED_USERS.strip() else set()
+)
+
 # Telegram message length limit
 TELEGRAM_MAX_LEN = 4096
 
@@ -213,9 +222,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     chat_id = str(update.effective_chat.id)
+    user_id = str(update.effective_user.id)
 
     # Chat filter
     if ALLOWED_CHAT_SET and chat_id not in ALLOWED_CHAT_SET:
+        return
+
+    # User ID filter — silently ignore unauthorized users
+    if ALLOWED_USER_SET and user_id not in ALLOWED_USER_SET:
+        log.warning(f"Blocked unauthorized user {user_id} in chat {chat_id}")
         return
 
     content = update.message.text.strip()
@@ -316,6 +331,10 @@ if __name__ == "__main__":
     print(f"  API URL:  {A0_API_URL}")
     print(f"  API Key:  {A0_API_KEY[:4]}****")
     print(f"  Timeout:  {A0_TIMEOUT}s")
+    if ALLOWED_USER_SET:
+        print(f"  Users:    {', '.join(ALLOWED_USER_SET)}")
+    else:
+        print(f"  Users:    (all)")
     print("=" * 60)
 
     # Build and run the Telegram bot

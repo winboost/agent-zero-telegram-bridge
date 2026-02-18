@@ -194,6 +194,32 @@ docker exec agent-zero ps aux | grep telegram_bridge
 docker logs agent-zero --tail 50
 ```
 
+## Restrict by User ID (optional)
+
+You can limit the bot to specific Telegram users so that only you (or a set of people) can interact with it.
+
+**1. Get your user ID** — message [@userinfobot](https://t.me/userinfobot) on Telegram. It will reply with your numeric user ID.
+
+**2. Add it to `.env`** — open `/a0/usr/.env` and add:
+
+```
+TELEGRAM_USER_IDS=123456789
+```
+
+For multiple users, separate with commas: `TELEGRAM_USER_IDS=123456789,987654321`
+
+**3. Restart the bot:**
+
+```bash
+docker exec agent-zero supervisorctl restart telegram_bridge
+```
+
+When the bot starts, the banner will show the allowed user IDs. If `TELEGRAM_USER_IDS` is not set or empty, all users are allowed (the default). Unauthorized users are silently ignored — they receive no response.
+
+> This filter works alongside the existing `TELEGRAM_CHAT_IDS` filter. Both can be used at the same time.
+
+---
+
 ## Telegram Bot Commands
 
 | Command | Description |
